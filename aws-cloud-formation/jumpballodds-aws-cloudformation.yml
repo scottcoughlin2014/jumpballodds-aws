@@ -1,0 +1,335 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation for jumpballodds Web App: This template sets up a VPC, PublicSubnet,
+  WebServerInstance, ElasticIP, WebServerSecurityGroup, InternetGateWay in order to
+  run the jumpballodds django app.
+Parameters:
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t1.micro
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - m1.small
+      - m1.medium
+      - m1.large
+      - m1.xlarge
+      - m2.xlarge
+      - m2.2xlarge
+      - m2.4xlarge
+      - m3.medium
+      - m3.large
+      - m3.xlarge
+      - m3.2xlarge
+      - c1.medium
+      - c1.xlarge
+      - c3.large
+      - c3.xlarge
+      - c3.2xlarge
+      - c3.4xlarge
+      - c3.8xlarge
+      - c4.large
+      - c4.xlarge
+      - c4.2xlarge
+      - c4.4xlarge
+      - c4.8xlarge
+      - g2.2xlarge
+      - r3.large
+      - r3.xlarge
+      - r3.2xlarge
+      - r3.4xlarge
+      - r3.8xlarge
+      - i2.xlarge
+      - i2.2xlarge
+      - i2.4xlarge
+      - i2.8xlarge
+      - d2.xlarge
+      - d2.2xlarge
+      - d2.4xlarge
+      - d2.8xlarge
+      - hi1.4xlarge
+      - hs1.8xlarge
+      - cr1.8xlarge
+      - cc2.8xlarge
+      - cg1.4xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance.
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  SSHLocation:
+    Description: 'The IP address range that can be used to access the web server using SSH.'
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.120.0.0/16
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  HTTPLocation:
+    Description: 'The IP address range that can be used to access the web server using HTTP/HTTPS.'
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.120.0.0/16
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+Mappings:
+  AWSInstanceType2Arch:
+    t1.micro:
+      Arch: PV64
+    t2.micro:
+      Arch: HVM64
+    t2.small:
+      Arch: HVM64
+    t2.medium:
+      Arch: HVM64
+    m1.small:
+      Arch: PV64
+    m1.medium:
+      Arch: PV64
+    m1.large:
+      Arch: PV64
+    m1.xlarge:
+      Arch: PV64
+    m2.xlarge:
+      Arch: PV64
+    m2.2xlarge:
+      Arch: PV64
+    m2.4xlarge:
+      Arch: PV64
+    m3.medium:
+      Arch: HVM64
+    m3.large:
+      Arch: HVM64
+    m3.xlarge:
+      Arch: HVM64
+    m3.2xlarge:
+      Arch: HVM64
+    c1.medium:
+      Arch: PV64
+    c1.xlarge:
+      Arch: PV64
+    c3.large:
+      Arch: HVM64
+    c3.xlarge:
+      Arch: HVM64
+    c3.2xlarge:
+      Arch: HVM64
+    c3.4xlarge:
+      Arch: HVM64
+    c3.8xlarge:
+      Arch: HVM64
+    c4.large:
+      Arch: HVM64
+    c4.xlarge:
+      Arch: HVM64
+    c4.2xlarge:
+      Arch: HVM64
+    c4.4xlarge:
+      Arch: HVM64
+    c4.8xlarge:
+      Arch: HVM64
+    g2.2xlarge:
+      Arch: HVMG2
+    r3.large:
+      Arch: HVM64
+    r3.xlarge:
+      Arch: HVM64
+    r3.2xlarge:
+      Arch: HVM64
+    r3.4xlarge:
+      Arch: HVM64
+    r3.8xlarge:
+      Arch: HVM64
+    i2.xlarge:
+      Arch: HVM64
+    i2.2xlarge:
+      Arch: HVM64
+    i2.4xlarge:
+      Arch: HVM64
+    i2.8xlarge:
+      Arch: HVM64
+    d2.xlarge:
+      Arch: HVM64
+    d2.2xlarge:
+      Arch: HVM64
+    d2.4xlarge:
+      Arch: HVM64
+    d2.8xlarge:
+      Arch: HVM64
+    hi1.4xlarge:
+      Arch: HVM64
+    hs1.8xlarge:
+      Arch: HVM64
+    cr1.8xlarge:
+      Arch: HVM64
+    cc2.8xlarge:
+      Arch: HVM64
+  AWSRegionArch2AMI:
+    us-east-1:
+      PV64: ami-1ccae774
+      HVM64: ami-1ecae776
+      HVMG2: ami-8c6b40e4
+    us-west-2:
+      PV64: ami-ff527ecf
+      HVM64: ami-e7527ed7
+      HVMG2: ami-abbe919b
+    us-west-1:
+      PV64: ami-d514f291
+      HVM64: ami-d114f295
+      HVMG2: ami-f31ffeb7
+    eu-west-1:
+      PV64: ami-bf0897c8
+      HVM64: ami-a10897d6
+      HVMG2: ami-d5bc24a2
+    eu-central-1:
+      PV64: ami-ac221fb1
+      HVM64: ami-a8221fb5
+      HVMG2: ami-7cd2ef61
+    ap-northeast-1:
+      PV64: ami-27f90e27
+      HVM64: ami-cbf90ecb
+      HVMG2: ami-6318e863
+    ap-southeast-1:
+      PV64: ami-acd9e8fe
+      HVM64: ami-68d8e93a
+      HVMG2: ami-3807376a
+    ap-southeast-2:
+      PV64: ami-ff9cecc5
+      HVM64: ami-fd9cecc7
+      HVMG2: ami-89790ab3
+    sa-east-1:
+      PV64: ami-bb2890a6
+      HVM64: ami-b52890a8
+      HVMG2: NOT_SUPPORTED
+    cn-north-1:
+      PV64: ami-fa39abc3
+      HVM64: ami-f239abcb
+      HVMG2: NOT_SUPPORTED
+Resources:
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      CidrBlock: 10.0.0.0/16
+  PublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      VpcId: !Ref VPC
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  WebServerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Allow access from HTTP/HTTPS and SSH traffic
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: !Ref HTTPLocation
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: !Ref HTTPLocation
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: !Ref SSHLocation
+  WebServerInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !FindInMap 
+        - AWSRegionArch2AMI
+        - !Ref 'AWS::Region'
+        - !FindInMap 
+          - AWSInstanceType2Arch
+          - !Ref InstanceType
+          - Arch
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - GroupSet:
+            - !Ref WebServerSecurityGroup
+          AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          DeleteOnTermination: 'true'
+          SubnetId: !Ref PublicSubnet
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          rpm -Uvh https://s3.amazonaws.com/amazoncloudwatch-agent/centos/amd64/latest/amazon-cloudwatch-agent.rpm
+          yum update -y # good practice to update existing packages
+          easy_install --script-dir /opt/aws/bin https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+          #/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WebServerInstance --region ${AWS::Region} --configsets All
+          #/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource WebServerInstance --region ${AWS::Region}
+          yum group install "Development Tools" -y
+          yum install -y mod_ssl httpd-devel httpd mod_wsgi wget git
+          systemctl start httpd && systemctl enable httpd
+          yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+          yum install postgresql12 postgresql12-server -y
+          /usr/pgsql-12/bin/postgresql-12-setup initdb
+          systemctl enable postgresql-12
+          systemctl start postgresql-12
+          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/anaconda3.sh
+          bash /tmp/anaconda3.sh -b -p /opt/anaconda3
+          rm /tmp/anaconda3.sh
+          useradd webapp
+          usermod -a -G apache webapp
+          echo ". /opt/anaconda3/etc/profile.d/conda.sh" >> /home/centos/.bashrc
+          echo ". /opt/anaconda3/etc/profile.d/conda.sh" >> /home/webapp/.bashrc
+          su - webapp bash -c 'conda create --name fanduel_nba_jumpball django python=3.8 --yes; conda activate fanduel_nba_jumpball; pip install mod_wsgi requests'
+          su - webapp bash -c 'git clone https://github.com/scottcoughlin2014/jumpballodds.git /home/webapp/nbajump'
+          su - webapp bash -c 'conda activate fanduel_nba_jumpball; cd /home/webapp/jumpballodds; git checkout production; bash src'
+          printf 'WSGIPythonHome /home/webapp/.conda/envs/fanduel_nba_jumpball/\nLoadModule wsgi_module /home/webapp/.conda/envs/fanduel_nba_jumpball/lib/python3.8/site-packages/mod_wsgi/server/mod_wsgi-py38.cpython-38-x86_64-linux-gnu.so' > /etc/httpd/conf.modules.d/10-wsgi.conf
+          sed -i '86ihost    fanduel_nba_jumpball             jumpnba             127.0.0.1/32            md5' /var/lib/pgsql/12/data/pg_hba.conf
+          sed -i '61i# Django Application Stuff\nAlias /static /home/webapp/jumpballodds/static\n<Directory /home/webapp/nbajump/static>\nRequire all granted\n</Directory>\n\n<Directory /home/webapp/nbajump/jumpnba>\n<Files wsgi.py>\nRequire all granted\n</Files>\n</Directory>\nWSGIApplicationGroup %{GLOBAL}\nWSGIDaemonProcess nbajump processes=1 maximum-requests=10 threads=1 python-path=/home/webapp/nbajump/:/home/webapp/.conda/envs/fanduel_nba_jumpball/lib/python3.8/site-packages/\nWSGIProcessGroup nbajump\nWSGIScriptAlias / /home/webapp/nbajump/jumpnba/wsgi.py\nWSGIPassAuthorization On' /etc/httpd/conf.d/ssl.conf
+          sed -i '/User apache/s/User apache/User webapp/' /etc/httpd/conf/httpd.conf 
+          sed -i '/Group apache/s/Group apache/Group webapp/' /etc/httpd/conf/httpd.conf
+          setenforce 0
+          systemctl restart httpd
+          
+    DependsOn:
+      - PublicRoute
+  ElasticIP:
+    Type: 'AWS::EC2::EIP'
+    Properties: 
+      Domain: vpc
+      InstanceId: !Ref WebServerInstance
+    DependsOn:
+      - WebServerInstance
+Outputs:
+  URL:
+    Value: !Join 
+      - ''
+      - - 'http://'
+        - !GetAtt 
+          - WebServerInstance
+          - PublicIp
+    Description: Newly created application URL
