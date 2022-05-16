@@ -289,41 +289,24 @@ Resources:
           easy_install --script-dir /opt/aws/bin https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
           #/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WebServerInstance --region ${AWS::Region} --configsets All
           #/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource WebServerInstance --region ${AWS::Region}
-          yum group install "Development Tools" -y
-          yum install -y mod_ssl httpd-devel httpd mod_wsgi wget git
-          systemctl start httpd && systemctl enable httpd
-          yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-          yum install postgresql12 postgresql12-server -y
-          /usr/pgsql-12/bin/postgresql-12-setup initdb
-          systemctl enable postgresql-12
-          systemctl start postgresql-12
-          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/anaconda3.sh
-          bash /tmp/anaconda3.sh -b -p /opt/anaconda3
-          rm /tmp/anaconda3.sh
+          yum install -y docker
+          curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" \
+    -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          usermod -a -G docker ec2-user
           useradd webapp
-          usermod -a -G apache webapp
-          echo ". /opt/anaconda3/etc/profile.d/conda.sh" >> /home/centos/.bashrc
-          echo ". /opt/anaconda3/etc/profile.d/conda.sh" >> /home/webapp/.bashrc
-          su - webapp bash -c 'conda create --name fanduel_nba_jumpball django python=3.8 --yes; conda activate fanduel_nba_jumpball; pip install mod_wsgi requests'
-          su - webapp bash -c 'git clone https://github.com/scottcoughlin2014/jumpballodds.git /home/webapp/nbajump'
-          su - webapp bash -c 'conda activate fanduel_nba_jumpball; cd /home/webapp/jumpballodds; git checkout production; bash src'
-          printf 'WSGIPythonHome /home/webapp/.conda/envs/fanduel_nba_jumpball/\nLoadModule wsgi_module /home/webapp/.conda/envs/fanduel_nba_jumpball/lib/python3.8/site-packages/mod_wsgi/server/mod_wsgi-py38.cpython-38-x86_64-linux-gnu.so' > /etc/httpd/conf.modules.d/10-wsgi.conf
-          sed -i '86ihost    fanduel_nba_jumpball             jumpnba             127.0.0.1/32            md5' /var/lib/pgsql/12/data/pg_hba.conf
-          sed -i '61i# Django Application Stuff\nAlias /static /home/webapp/jumpballodds/static\n<Directory /home/webapp/nbajump/static>\nRequire all granted\n</Directory>\n\n<Directory /home/webapp/nbajump/jumpnba>\n<Files wsgi.py>\nRequire all granted\n</Files>\n</Directory>\nWSGIApplicationGroup %{GLOBAL}\nWSGIDaemonProcess nbajump processes=1 maximum-requests=10 threads=1 python-path=/home/webapp/nbajump/:/home/webapp/.conda/envs/fanduel_nba_jumpball/lib/python3.8/site-packages/\nWSGIProcessGroup nbajump\nWSGIScriptAlias / /home/webapp/nbajump/jumpnba/wsgi.py\nWSGIPassAuthorization On' /etc/httpd/conf.d/ssl.conf
-          sed -i '/User apache/s/User apache/User webapp/' /etc/httpd/conf/httpd.conf 
-          sed -i '/Group apache/s/Group apache/Group webapp/' /etc/httpd/conf/httpd.conf
-          setenforce 0
-          systemctl restart httpd
-          
+          su - webapp bash -c 'git clone https://github.com/scottcoughlin2014/jumpballodds-aws.git /home/webapp/jumpballodds-aws'
+          su - webapp bash -c 'cd /home/webapp/jumpballodds-aws/docker; docker-compose -f docker-compose.prod.yml up -d'
+
     DependsOn:
       - PublicRoute
-  ElasticIP:
-    Type: 'AWS::EC2::EIP'
-    Properties: 
-      Domain: vpc
-      InstanceId: !Ref WebServerInstance
-    DependsOn:
-      - WebServerInstance
+#  ElasticIP:
+#    Type: 'AWS::EC2::EIP'
+#    Properties: 
+#      Domain: vpc
+#      InstanceId: !Ref WebServerInstance
+#    DependsOn:
+#      - WebServerInstance
 Outputs:
   URL:
     Value: !Join 
