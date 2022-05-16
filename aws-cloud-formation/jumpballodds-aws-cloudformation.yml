@@ -296,7 +296,7 @@ Resources:
           usermod -a -G docker ec2-user
           useradd webapp
           su - webapp bash -c 'git clone https://github.com/scottcoughlin2014/jumpballodds-aws.git /home/webapp/jumpballodds-aws'
-          su - webapp bash -c 'cd /home/webapp/jumpballodds-aws/docker; docker-compose -f docker-compose.prod.yml up -d'
+          su - webapp bash -c 'cd /home/webapp/jumpballodds-aws/docker; cp .env.template .env; docker-compose -f docker-compose.prod.yml up -d'
 
     DependsOn:
       - PublicRoute
