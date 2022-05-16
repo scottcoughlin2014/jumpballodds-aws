@@ -33,6 +33,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - ../:/home/web/code
+      - static_volume:/home/web/code/staticfiles
+      - media_volume:/home/web/code/mediafiles
     ports:
       - 8000:8000
 
@@ -40,9 +42,10 @@ services:
     build:
       context: ./nginx
     volumes:
-      - static_volume:/usr/src/app/staticfiles
-      - media_volume:/usr/src/app/mediafiles
+      - static_volume:/home/web/code/staticfiles
+      - media_volume:/home/web/code/mediafiles
     ports:
+      - 443:443
       - 80:80
     depends_on:
       - jumpballodds
